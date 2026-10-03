@@ -1,0 +1,24 @@
+{
+  "locale": "zh_CN",
+  "storefront_url": "https://www.apple.com.cn",
+  "location": "上海 上海市 黄浦区",
+  "city": "上海",
+  "stores": {
+    "R000": "示例 Apple Store"
+  },
+  "products": [
+    {
+      "name": "示例产品 256GB 黑色",
+      "part_number": "XXXXXXCH/A",
+      "url": "https://www.apple.com.cn/shop/buy-iphone/example",
+      "stores": ["R000"]
+    }
+  ],
+  "interval_seconds": 30,
+  "start_at": null,
+  "open_bag_on_hit": true,
+  "stop_on_hit": true,
+  "desktop_notifications": true,
+  "bark_urls": [],
+  "runtime_dir": "runtime"
+}

@@ -1,0 +1,48 @@
+(() => {
+  const results = [];
+  function test(name, fn) { try { if (!fn()) throw Error('assertion failed'); results.push({name,passed:true}); } catch(e) { results.push({name,passed:false,error:e.message}); } }
+  const plan = {variant:{partNumber:'TEST001/A',selections:{},url:'https://www.apple.com.cn/shop/product/test001/a'},autoSubmit:false,maxTotal:100};
+  const mount = html => { document.body.innerHTML = html; };
+  test('WebKit origin is the official fixture base', () => location.hostname === 'www.apple.com.cn');
+  const source = new DOMParser().parseFromString(window.fixtureHTML, 'text/html');
+  const script = [...source.scripts].find(s => s.textContent.includes('window.PRODUCT_SELECTION_BOOTSTRAP ='));
+  mount('<h1>iPhone Duo</h1>');
+  const inert = document.createElement('script'); inert.type = 'text/plain'; inert.textContent = script.textContent; document.body.append(inert);
+  const decorated = document.createElement('a'); decorated.href = '/shop/buy-iphone/iphone-duo/mk2u4ch/a?afid=test#options'; decorated.textContent = 'decorated product link'; document.body.append(decorated);
+  test('real Apple JavaScript wrapper parses eight variants', () => StoreAssistant.catalog().variants.length === 8);
+  test('real Apple display values are clean and ordered', () => StoreAssistant.catalog().groups.find(g=>g.key==='dimensionCapacity').options.map(x=>x.label).join(',') === '256GB,512GB,1TB,2TB');
+  test('real Apple 1TB nightsky price and part match', () => { const v = StoreAssistant.catalog().variants.find(v=>v.partNumber==='MK2U4CH/A'); return v.price===21499 && v.selections.dimensionCapacity==='1tb'; });
+  test('decorated Apple product links are saved canonically', () => StoreAssistant.catalog().variants.find(v=>v.partNumber==='MK2U4CH/A').url === 'https://www.apple.com.cn/shop/buy-iphone/iphone-duo/mk2u4ch/a');
+  mount('<button id="add" onclick="this.dataset.clicked=1">加入购物袋</button>');
+  test('dry run does not click', () => StoreAssistant.step(plan,{kind:'add'},true).state==='ready' && !document.querySelector('button').dataset.clicked);
+  test('actual action clicks exactly once', () => StoreAssistant.step(plan,{kind:'add'},false).state==='clicked' && document.querySelector('button').dataset.clicked==='1');
+  mount('<button disabled>加入购物袋</button>');
+  test('disabled purchase waits', () => StoreAssistant.step(plan,{kind:'add'},false).state==='waiting');
+  mount('<button>加入购物袋</button><button>加入购物袋</button>');
+  test('ambiguous buttons cannot click', () => StoreAssistant.step(plan,{kind:'add'},false).state==='manual');
+  mount('<input name="product" value="OTHER001/A"><button>加入购物袋</button>');
+  test('conflicting product overrides matching URL', () => StoreAssistant.step(plan,{kind:'add'},true).state==='manual');
+  mount('<input type=password><button>加入购物袋</button>');
+  test('login requires human action', () => StoreAssistant.step(plan,{kind:'add'},true).state==='manual');
+  mount('<p>请输入验证码</p><button>加入购物袋</button>');
+  test('verification requires human action', () => StoreAssistant.step(plan,{kind:'add'},true).state==='manual');
+  function bag(q=1) { return `<div data-autom="bag-item"><a href="https://www.apple.com.cn/shop/product/test001/a">TEST001/A</a><select name="quantity"><option value="${q}">${q}</option></select></div>`; }
+  mount(bag()+'<button>结账</button>');
+  test('one matching item and quantity can check out', () => StoreAssistant.step(plan,{kind:'checkout'},true).state==='ready');
+  test('existing matching bag skips adding again', () => StoreAssistant.step(plan,{kind:'add'},true).state==='done');
+  mount(bag(2)+'<button>结账</button>');
+  test('wrong quantity blocks checkout', () => StoreAssistant.step(plan,{kind:'checkout'},true).state==='manual');
+  mount(bag()+bag()+'<button>结账</button>');
+  test('multiple bag items block checkout', () => StoreAssistant.step(plan,{kind:'checkout'},true).state==='manual');
+  const action = {kind:'submit',host:location.hostname,path:location.pathname,selector:'#submit',label:'提交订单'};
+  mount(bag()+'<div data-autom="summary-total">¥ 100.00</div><button id="submit">提交订单</button>');
+  test('final submit disabled by default', () => StoreAssistant.step(plan,action,true).state==='manual');
+  plan.autoSubmit = true;
+  test('final submit requires verified total within cap', () => StoreAssistant.step(plan,action,true).state==='ready');
+  plan.maxTotal = 99;
+  test('price cap blocks final submit', () => StoreAssistant.step(plan,action,true).state==='manual');
+  mount('<label for="c">黑色</label><input id="c" name="color" type="radio" value="black"><label for="t">不折抵换购</label><input id="t" name="tradein" type="radio"><label for="a">不加 AppleCare+ 服务计划</label><input id="a" name="care" type="radio">');
+  plan.variant.selections = {color:'black'};
+  test('preparation selects exact color and explicitly shown extras policy', () => { StoreAssistant.prepare(plan); StoreAssistant.prepare(plan); StoreAssistant.prepare(plan); return [...document.querySelectorAll('input')].every(e=>e.checked); });
+  return {passed:results.filter(r=>r.passed).length,failed:results.filter(r=>!r.passed).length,results};
+})();

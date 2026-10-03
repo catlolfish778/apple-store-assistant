@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apple-store-assistant"
+version = "0.1.0"
+description = "Local Apple Store availability monitor and manual checkout assistant"
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "Private project; review third-party licenses before distribution"}
+authors = [{name = "Local project"}]
+
+[project.scripts]
+apple-store-assistant = "apple_store_assistant.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["apple_store_assistant*"]
