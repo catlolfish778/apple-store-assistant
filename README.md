@@ -1,43 +1,70 @@
 # Apple Store Assistant
 
-## 当前交付：原生 App 0.2
+> 一个独立的 macOS Apple Store 购买准备工具，与 Apple 无关联。
 
-双击根目录 `Apple Store Assistant.app`。新版使用 Swift + 系统 WebKit，将真实官方商品目录、规格选择、计划保存、账号登录、购物袋与定时执行集中在 App 内，不再依赖 Python 或外部 Chrome。
+## 当前版本：原生 App 0.3
 
-完整使用方法、自动执行范围、已验证证据与限制见 [NATIVE_APP.md](NATIVE_APP.md)。原生源码在 `native/`，执行 `bash native/build.sh` 构建。下面内容描述的是保留的旧 Python/Tk MVP，不再代表当前桌面版。
+这个 App 帮你提前选定 Apple 中国官网商品和具体规格，在指定时间通过可见的购买流程减少重复操作。库存由 Apple 实时决定；商品进入购物袋不代表库存已锁定，App 不承诺下单成功。
 
-## 历史 Python / Tk MVP
+原生 App 的完整操作步骤、边界和验证记录见 [NATIVE_APP.md](NATIVE_APP.md)。原生源码在 `native/`，构建命令为 `bash native/build.sh`。
 
-本项目是一个本地运行的 Apple Store 商品预配置与开售时购买辅助工具。目标是让用户提前把 Apple 官方商品的精确配置保存为订单包，到点时使用已核验的 `partNumber` 和商品链接，减少重复选择步骤。
+## 购买流程
 
-当前代码仍是 MVP：离线官方目录解析与 `OrderPackage` 内核、自提库存查询、专用浏览器会话和到点打开官方页面已经可用；桌面端的“目录选择 → 保存订单包 → 页面校验”尚未接入。不要把现有 UI 预设误认为已实现的订单包或库存锁定。
+1. 选择或创建商品计划，核对官方商品页、具体规格和型号编号。
+2. 在 App 管理的专用 Edge/Chrome 窗口中登录 Apple 账号，并完成 Apple 要求的身份验证。
+3. 设置门店、取货联系人、发票资料和开售时间，然后点击“一键托管”。
+4. 到设定时间，App 在专用浏览器中按计划准备商品、核对购物袋，并进入 Apple 官方结账页面。
+5. 可选择由 App 自动填写已保存的联系人/发票资料，并按用户选择的支付宝或微信核对订单。开启此功能后，App 可以在订单核对页（Review）信息匹配时向 Apple 提交订单，等待 Apple 确认待付款订单后停止。
+6. 用户自行完成 Apple 要求的验证码、身份验证及实际付款。App 不进入支付宝/微信付款流程，也不会点击“现在支付”。
 
-当前版本的边界：
+如果商品、数量、取货门店、付款方式或总金额无法确认，App 会暂停并交给用户检查；结果不明确时不会重复提交。
 
-- 查询指定 Apple Store 直营店的自提状态；
-- 可保存手工填写的商品、`part_number`、门店和浏览器预设；
-- iPhone Duo 是已完成官方目录核验和解析测试的样例，目录驱动选择器正在开发；
-- 发现明确有货时发送通知并打开官方商品页或购物袋；
-- 不保存 Apple 账号密码、Cookie、银行卡或支付密码；
-- 只通过 Apple 官方结账页面操作；用户选择支付宝或微信后，程序可继续核对并创建待付款订单，确认订单后停止；不自动付款，也不处理验证码、二次验证或支付验证；
-- 商品配置最终将以 Apple 官方商品页解析出的 `partNumber` 为准；
-- 不使用多账号、代理轮换、验证码识别、指纹伪装或其他规避风控手段。
+目前尚未在真实开售中验证从开售到生成待付款订单的完整链路；现有验证主要覆盖离线演练和本地隔离浏览器流程。
 
-Apple 的网站使用条款可能限制自动化访问。使用前请确认用途和频率符合适用条款；本项目不会保证库存或订单成功。
+## 浏览器与账号
 
-## 快速开始
+- 真实登录和购买流程使用 App 启动或接管的**专用 Edge/Chrome 配置**，与用户日常浏览器配置分开。App 内的 WebKit 只用于读取商品规格或诊断，不承担真实购买操作。
+- Apple 登录在专用浏览器的 Apple 官方页面完成。App 可调用该浏览器自己的密码管理器填入已保存的登录凭据；只有确认账号一致且密码栏已填入后，才会提交一次登录。App 只检查密码栏是否已填入，不读取密码文本，也不会把密码内容写入配置、任务状态或日志。
+- Apple 登录状态和 Cookie 保留在专用浏览器资料目录中，供下次使用；App 不把它们复制到普通浏览器或 App 日志。正常退出会关闭专用浏览器进程，但保留该目录。用户日常使用的 Edge/Chrome 不受影响。
+- 若 Apple 要求验证码、二次验证或重新登录，用户需要在专用浏览器中完成。
 
-macOS 独立 App 可以直接双击运行：
+## 联系人、发票与付款资料
 
-`Apple Store Assistant.app`
+- 点击“保存联系人与发票资料”后，联系人和发票预设保存到本机 macOS 钥匙串，设为本机设备专用，不通过钥匙串同步。可以用“清除本机保存资料”删除联系人和发票字段；门店、付款方式和默认发票类型等偏好会保留。
+- 资料可包括取货联系人、邮箱、电话、身份证件后四位、个人发票抬头、公司名称和税号，以及增值税专用发票所需的公司和银行信息。身份证件后四位默认只在当前 App 会话中保留；只有勾选保存后才跨次保留。
+- 增值税专用发票条款只有在用户阅读并明确授权后，App 才会代为勾选。Apple 页面资料缺失、字段不明确或条款授权未保存时，自动填写会暂停。
+- 付款自动化仅支持用户选择的支付宝或微信。App 保存所选付款方式，不保存支付宝/微信账号、支付密码、银行卡号或验证码；发票资料中的公司银行信息属于发票预设，保存在 macOS 钥匙串。
 
-它是打包后的原生 `.app`，不会再弹出终端窗口。
+当前支持方式及未来新增方式所需的代码位置、页面适配和验证要求，见 [架构文档的付款方式扩展说明](ARCHITECTURE.md)。
 
-开发备用启动器：
+## 本机数据与隐私
 
-`启动苹果抢购助手.command`
+数据目录：`~/Library/Application Support/AppleStoreAssistantNative/`
 
-桌面版支持商品/门店/时间配置、购买配置预设、专用 Chrome 会话、托管准备模式、账号状态指示器、静默等待和到点打开官方购物袋。用户第一次在专用 Chrome 配置中手动登录 Apple，程序不读取或保存密码、Cookie 或银行卡；最终订单确认和支付仍在 Apple 官方页面完成。详细说明见 [`MAC_APP_README.md`](MAC_APP_README.md)。
+- 商品计划、任务状态、运行设置和诊断记录保存在本机。任务录制包含执行阶段、时间、商品型号和页面按钮状态，用于复盘操作结果；不保存账号、地址、付款资料、Cookie、页面正文或请求内容。
+- Apple 登录会话单独保存在专用浏览器资料目录；联系人和发票预设单独保存在 macOS 钥匙串。
+- Apple 确认生成待付款订单后，任务状态会记录订单号和页面显示的付款期限。订单号和付款期限不是付款凭证，也不代表库存已为用户保留。
+- 删除 App 数据目录会清除本机保存的计划、任务记录和专用浏览器登录会话；请先退出 App。清除钥匙串中的联系人和发票资料可在 App 中单独操作。
+
+## 使用边界
+
+- 所有购买页面操作均在 Apple 官方页面进行；本工具不会绕过验证码、二次验证、限流或其他风控，也不使用多账号、代理轮换或指纹伪装。
+- Apple 页面、库存和结账规则可能变化。使用前请确认自动化访问符合 Apple 适用的网站条款。
+- App 会尽量核对型号、数量、取货门店、付款方式和总金额，但不会锁定库存，也不保证订单或购买成功。
+- 创建待付款订单不等于完成付款；最终付款由用户在 Apple 官方流程中自行决定。
+
+## 构建与验证
+
+```bash
+bash native/build.sh
+bash native/test-automation.sh
+```
+
+当前验证范围、未验证事项和演练边界见 [NATIVE_APP.md](NATIVE_APP.md) 与 [native/VALIDATION.md](native/VALIDATION.md)。离线演练和本机模拟不访问 Apple 账号、不创建真实订单，不能用于推断真实开售的时延或成功率。
+
+## 旧版 Python/Tk 与 CLI
+
+仓库仍保留早期 Python/Tk 原型和自提库存查询 CLI。它们与当前原生 App 是不同的旧流程；以下命令只用于旧 CLI，不启动原生托管购买流程：
 
 ```bash
 python3 -m apple_store_assistant validate -c config.example.json
@@ -45,35 +72,4 @@ python3 -m apple_store_assistant check -c config.example.json --no-open
 python3 -m apple_store_assistant run -c config.example.json
 ```
 
-配置产品时需要填写 Apple 商品页对应的完整 `part_number`，例如 `XXXXXXCH/A`，不能只填写营销名称。门店编号应来自 Apple 商品页的直营店查询结果。
-
-## 配置说明
-
-关于官方商品页数据、配置选项到 `partNumber` 的映射、购物袋不等于库存锁定，以及结账接口的工程边界，见 [APPLE_OFFICIAL_DATA_AND_CHECKOUT_BOUNDARIES.md](APPLE_OFFICIAL_DATA_AND_CHECKOUT_BOUNDARIES.md)。当前能力、缺口和实施顺序见 [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md)。
-
-复制 `config.example.json` 为本地配置，并修改：
-
-- `location`：Apple 自提查询使用的城市/区域/邮编；
-- `city`：用于校验返回的门店城市；
-- `stores`：门店编号到名称的映射；
-- `products`：产品名称、零件号、官方商品页和目标门店；
-- `interval_seconds`：轮询间隔，最小 30 秒；
-- `start_at`：可选，ISO 8601 计划开始时间；
-- `bark_urls`：可选的 HTTPS Bark 地址数组。
-
-示例配置中的零件号是占位符，只用于演示结构，不能直接查询真实产品。
-
-## 测试
-
-```bash
-python3 -m unittest discover -s tests -v
-python3 -m apple_store_assistant check -c config.example.json --fixture tests/fixtures/available.json --no-open
-```
-
-## 开发路线
-
-1. 完成自提库存适配器、三态模型、退避和状态持久化。
-2. 增加配置界面和 macOS 菜单栏/托盘体验。
-3. 先接入官方目录解析和不可变订单包，再替换手工配置表单。
-4. 增加可见浏览器中的订单包核验和受控交接，并在最终确认/支付前停止。
-5. 通过固定目录快照和受控页面测试发现结构变化，不以高频请求作为测试方式。
+旧 CLI 的配置字段和限制见 [APPLE_OFFICIAL_DATA_AND_CHECKOUT_BOUNDARIES.md](APPLE_OFFICIAL_DATA_AND_CHECKOUT_BOUNDARIES.md)。
