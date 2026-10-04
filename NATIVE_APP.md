@@ -49,7 +49,7 @@
 - 已发出的动作可在剩余执行窗口内持续观察。旧的“4 秒无反馈就暂停”已移除；页面旧成功提示不能当作本次加购成功。
 - 购物袋型号和数量必须明确匹配；结账前在同一次浏览器调用中再次核验，避免切换页面后误点。
 - 结账交接须同时满足允许的 Apple 中国商店主机、结账路径、非登录验证状态和可识别的配送/付款/订单摘要内容。它不表示订单成立或付款完成。
-- “取货与结账资料”使用独立边框卡片管理门店、取货联系人和发票预设。联系人及发票字段保存在 macOS 钥匙串，不进入 `run.json`、日志或任务录制；身份证件只要求 Apple 页面所需的后四位，且默认不跨次保存。
+- “取货与结账资料”使用独立边框卡片管理门店、取货联系人和发票预设。联系人及发票字段保存在 macOS 钥匙串，不进入 `run.json`、日志或任务录制；只有 Apple 结账页要求身份证件信息时才填写页面指定的后四位，且默认不跨次保存。
 - 发票默认类型为个人电子发票，也可分别预设公司/其他和增值税专用发票。仅当用户在专票卡片中明确勾选已阅读并授权，程序才会代为勾选 Apple 发票条款。任何必填资料缺失、页面字段不唯一、发票类型不可用或继续按钮结果不明时都会停下，不会改选其他类型或重复点击。
 - 在“付款与下单”中只能选择支付宝或微信。程序必须确认选择结果后点击一次“检查订单”；Review 页面付款方式及总金额与预设不符时停止。核对通过后只点击一次“立即下单”，并等待 Apple 显示待付款订单；超时不会重试下单。
 - 正常终点是 Apple 确认待付款订单。程序记录订单号和页面显示的付款期限，随后停止；绝不点击“现在支付”，不接触支付宝/微信授权、付款密码或验证码。
@@ -149,6 +149,6 @@ build/native/bridge-tests
 python3 -m unittest discover -s tests -v
 ```
 
-构建产物：`dist/Apple Store Assistant Native.app`，本机 ad-hoc 签名，尚未 Developer ID 公证。旧 Tk App 保存在 `build/Apple Store Assistant Tk 20260919.app`，旧配置不删除。
+构建会同步更新项目根目录的 `Apple Store Assistant.app`（正常启动入口）和 `dist/Apple Store Assistant Native.app`，均为本机 ad-hoc 签名，尚未 Developer ID 公证。旧 Tk App 保存在 `build/Apple Store Assistant Tk 20260919.app`，旧配置不删除。
 
 技术依据：[WKWebView](https://developer.apple.com/documentation/webkit/wkwebview)、[WebKit 持久存储](https://developer.apple.com/documentation/webkit/wkwebsitedatastore/default())。公开商品来源：[iPhone Duo](https://www.apple.com.cn/shop/buy-iphone/iphone-duo)、[iPhone 17](https://www.apple.com.cn/shop/buy-iphone/iphone-17)。
