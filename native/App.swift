@@ -2394,6 +2394,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         }
         let expression = """
         (() => {
+          const expressionStartedAt = performance.now();
           const [city,name,storeNumber,flowToken] = \(payload);
           const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
           const norm = s => String(s || '').replace(/[\\u200b-\\u200f\\u2060]/g, '').replace(/\\s+/g, ' ').trim();
@@ -2438,6 +2439,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
               selectionEvidence:'store_selected_and_continue_enabled',
               storeClickToButtonReadyMS:Number.isFinite(storeChoiceClickedAt) ? Math.max(0,readyDetectedAt-storeChoiceClickedAt) : null,
               storeSelectedToButtonReadyMS:Number.isFinite(storeSelectedAt) ? Math.max(0,readyDetectedAt-storeSelectedAt) : null,
+              buttonReadinessCheckMS:Math.max(0,readyDetectedAt-expressionStartedAt),
               buttonReadyDetectedToClickMS:0
             };
             window.__asaPickupContactContinueResult = result;
@@ -2448,6 +2450,42 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
           // Once the pickup-details action has been issued, only observe the
           // route and contact fields; do not rescan the entire store list.
           if (window.__asaPickupContactContinueAttempted) return {state:'waiting_contact',fallback:window.__asaPickupStoreFallback === true,storeLabel:window.__asaPickupStoreLabel || ''};
+          // Apple may already have the configured store selected when the
+          // Fulfillment surface appears. Check that narrow, explicit signal
+          // before scanning every visible label, radio and button for the
+          // pickup-mode control. A selected store result implies pickup mode.
+          const fastSelectedStoreRadios = [...document.querySelectorAll('input[type="radio"][name="store-locator-result"]:checked')].filter(visible);
+          if (fastSelectedStoreRadios.length === 1) {
+            const radio = fastSelectedStoreRadios[0];
+            const fastControlSelector = 'label,[role="radio"],button,[role="listitem"],li,article,[data-autom]';
+            const card = [...(radio.labels || [])].find(visible) || radio.closest(fastControlSelector) || radio;
+            const lines = String(card.innerText || '').split(/\\n+/).map(norm).filter(Boolean);
+            const appleLine = lines.find(value => /^Apple(?:\\s|$)/i.test(value)) || lines.find(value => /Apple/i.test(value)) || '';
+            const storeLabel = appleLine.replace(/^\\d+\\s*/,'')
+              .replace(/\\s+(?:目前不可取货|暂不可取货|不可取货|今天|明天|可取货|店内取货|pickup|delivery)(?:\\s.*)?$/i,'').trim();
+            const cardText = text(card);
+            const unavailable = /(?:当前|目前|暂时)?不可取货|unavailable|sold\\s*out/i;
+            const storeAvailable = cardText.length >= 4 && cardText.length <= 480 && /Apple/i.test(cardText) && /可取货|pickup/i.test(cardText) && !unavailable.test(cardText);
+            const disabled = !!(card.disabled || card.getAttribute('aria-disabled') === 'true' || radio.disabled || radio.getAttribute('aria-disabled') === 'true');
+            const shortName = norm(name).startsWith(norm(city)) ? norm(name).slice(norm(city).length).trim() : norm(name);
+            const preferredLabel = /^Apple(?:\\s|$)/i.test(shortName) ? shortName : norm('Apple ' + shortName);
+            const preferredNames = new Set([norm(name),norm(preferredLabel)].filter(Boolean));
+            if (preferredNames.has(norm(storeLabel)) && storeAvailable && !disabled) {
+              const buttons = [...document.querySelectorAll('button,a,[role="button"],input[type="submit"]')].filter(visible)
+                .filter(e => norm(e.innerText || e.value || e.getAttribute('aria-label')) === '继续填写取货详情');
+              if (buttons.length === 1 && !buttons[0].disabled && buttons[0].getAttribute('aria-disabled') !== 'true') {
+                const attemptKey = `preferred:${storeNumber}`;
+                window.__asaPickupTargetStoreCard = card;
+                window.__asaPickupTargetStoreKey = attemptKey;
+                window.__asaPickupStoreSelectionActionKey = attemptKey;
+                window.__asaPickupStoreFallback = false;
+                window.__asaPickupStoreLabel = storeLabel;
+                if (window.__asaPickupStoreSelectionObservedAt == null)
+                  window.__asaPickupStoreSelectionObservedAt = performance.now();
+                return clickContinueOnce(buttons[0],attemptKey,false,storeLabel);
+              }
+            }
+          }
           const controls = [...document.querySelectorAll('label,[role="radio"],button,input[type="radio"]')].filter(visible);
           const pickup = controls.filter(e => /我要取货|店内取货|pickup/i.test(text(e))).sort((a,b) => text(a).length - text(b).length)[0];
           if (!pickup) return {state:'pickup_option_missing'};
@@ -2780,6 +2818,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                 case "contact_continue_clicked":
                     pickupDetailsContinueClickedAt = ProcessInfo.processInfo.systemUptime
                     let pageStep = facts["step"] as? String ?? "未知结账步骤"
+                    let buttonReadinessCheckMS = facts["buttonReadinessCheckMS"] as? Double
                     let buttonReadyDelayMS = facts["buttonReadyDetectedToClickMS"] as? Double
                     let storeClickToReadyMS = facts["storeClickToButtonReadyMS"] as? Double
                     let storeSelectedToReadyMS = facts["storeSelectedToButtonReadyMS"] as? Double
@@ -2794,6 +2833,10 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                         log("已确认首选门店已选中；\(pageStep) 的唯一“继续填写取货详情”按钮可用，立即点击：\(label)")
                     }
                     var readinessDetails = ["pageStep":pageStep,"storeLabel":label]
+                    if let buttonReadinessCheckMS {
+                        readinessDetails["buttonReadinessCheckMS"] = String(format:"%.1f", buttonReadinessCheckMS)
+                        log(String(format:"[执行耗时] 按钮状态检查至确认可用：%.1f ms", buttonReadinessCheckMS))
+                    }
                     if let storeClickToReadyMS {
                         readinessDetails["storeClickToButtonReadyMS"] = String(format:"%.1f", storeClickToReadyMS)
                     }
