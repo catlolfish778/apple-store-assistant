@@ -52,7 +52,7 @@ final class DedicatedAutomationBrowser: AutomationBrowser {
     static func accountExpression() -> String {
         """
         (() => {
-          const visible = e => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
+          const visible = e => !!e && !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
           const clean = s => String(s || '').replace(/\\s+/g,' ').trim();
           const checkoutPath = /^\\/shop\\/checkout(?:\\/|$)/i.test(location.pathname);
           const challengePattern = /验证你的身份|验证您的身份|输入验证码|安全验证|verify your identity/i;
@@ -72,14 +72,69 @@ final class DedicatedAutomationBrowser: AutomationBrowser {
           let checkout = null;
           if (checkoutPath) {
             const step = new URL(location.href).searchParams.get('_s') || '';
-            const pickupModeVisible = [...document.querySelectorAll('button,[role=button]')].filter(visible)
-              .some(e => /^(我要取货|店内取货|pickup)$/i.test(clean(e.innerText || e.getAttribute('aria-label'))));
+            const continueLabel = '继续填写取货详情';
+            const continueSelector = 'button,a,[role="button"],input[type="submit"]';
+            const continueButtonReady = button => !!button && !button.disabled &&
+              button.getAttribute('aria-disabled') !== 'true' && getComputedStyle(button).pointerEvents !== 'none';
+            const findContinueButtons = () => [...document.querySelectorAll(continueSelector)]
+              .filter(e => {
+                const aria = clean(e.getAttribute('aria-label'));
+                const value = clean(e.value);
+                const content = clean(e.textContent);
+                return aria.includes(continueLabel) || value.includes(continueLabel) || content.includes(continueLabel);
+              })
+              .filter(visible)
+              .filter(e => clean(e.innerText || e.value || e.getAttribute('aria-label')) === continueLabel);
+            const readinessKey = `${location.pathname}:${step}`;
+            if (/^Fulfillment(?:-|$)/i.test(step)) {
+              if (window.__asaCheckoutContinueReadinessKey !== readinessKey) {
+                window.__asaCheckoutContinueReadinessObserver?.disconnect();
+                window.__asaCheckoutContinueReadinessKey = readinessKey;
+                window.__asaCheckoutContinueReadinessMonitorStartedAt = performance.now();
+                window.__asaCheckoutContinueReadiness = null;
+                window.__asaCheckoutContinueReadinessState = false;
+                const sampleReadiness = source => {
+                  if (window.__asaCheckoutContinueReadinessKey !== readinessKey) return;
+                  const buttons = findContinueButtons();
+                  const ready = buttons.length === 1 && continueButtonReady(buttons[0]);
+                  if (ready && window.__asaCheckoutContinueReadinessState !== true) {
+                    window.__asaCheckoutContinueReadiness = {
+                      timeOrigin:performance.timeOrigin,
+                      step,
+                      readyAt:performance.now(),
+                      source
+                    };
+                  }
+                  window.__asaCheckoutContinueReadinessState = ready;
+                };
+                window.__asaCheckoutContinueReadinessSample = sampleReadiness;
+                const observer = new MutationObserver(() => sampleReadiness('mutation_observer'));
+                window.__asaCheckoutContinueReadinessObserver = observer;
+                observer.observe(document.documentElement || document, {
+                  subtree:true,childList:true,characterData:true,attributes:true,
+                  attributeFilter:['disabled','aria-disabled','aria-busy','aria-label','class','hidden','style']
+                });
+                sampleReadiness('initial_snapshot');
+              } else {
+                window.__asaCheckoutContinueReadinessSample?.('poll_snapshot');
+              }
+            } else if (window.__asaCheckoutContinueReadinessKey) {
+              window.__asaCheckoutContinueReadinessObserver?.disconnect();
+              window.__asaCheckoutContinueReadinessObserver = null;
+              window.__asaCheckoutContinueReadinessSample = null;
+              window.__asaCheckoutContinueReadinessKey = null;
+              window.__asaCheckoutContinueReadiness = null;
+              window.__asaCheckoutContinueReadinessState = false;
+            }
+            const continueButtons = findContinueButtons();
+            const pickupModeVisible = [...document.querySelectorAll('button,[role=button]')]
+              .some(e => /^(我要取货|店内取货|pickup)$/i.test(clean(e.textContent || e.getAttribute('aria-label'))) && visible(e));
             const storeRadios = [...document.querySelectorAll('input[name="store-locator-result"]')].filter(visible);
             const selectedStoreCount = storeRadios.filter(e => e.checked || e.getAttribute('aria-checked') === 'true').length;
-            const continueButtons = [...document.querySelectorAll('button,a,[role=button],input[type=submit]')].filter(visible)
-              .filter(e => clean(e.innerText || e.value || e.getAttribute('aria-label')) === '继续填写取货详情');
-            const contactFields = ['lastName','firstName','emailAddress','fullDaytimePhone']
-              .filter(name => [...document.querySelectorAll(`input[name="${name}"]`)].some(visible));
+            const contactFields = /^PickupContact(?:-|$)/i.test(step)
+              ? ['lastName','firstName','emailAddress','fullDaytimePhone']
+                  .filter(name => [...document.querySelectorAll(`input[name="${name}"]`)].some(visible))
+              : [];
             const fulfillmentSurface = /^Fulfillment(?:-|$)/i.test(step) &&
               (pickupModeVisible || storeRadios.length > 0 || continueButtons.length > 0);
             const contactSurface = /^PickupContact(?:-|$)/i.test(step) && contactFields.length > 0;
@@ -91,7 +146,12 @@ final class DedicatedAutomationBrowser: AutomationBrowser {
               storeRadioCount: String(storeRadios.length),
               selectedStoreCount: String(selectedStoreCount),
               continueButtonVisible: String(continueButtons.length > 0),
-              continueButtonReady: String(continueButtons.some(e => !e.disabled && e.getAttribute('aria-disabled') !== 'true')),
+              continueButtonReady: String(continueButtons.length === 1 && continueButtonReady(continueButtons[0])),
+              continueButtonMonitorActive: String(window.__asaCheckoutContinueReadinessObserver?.takeRecords !== undefined),
+              continueButtonFirstReadyAtMS: window.__asaCheckoutContinueReadiness ? String(window.__asaCheckoutContinueReadiness.readyAt) : '',
+              continueButtonFirstReadySource: window.__asaCheckoutContinueReadiness?.source || '',
+              continueButtonMonitorStartedAtMS: Number.isFinite(window.__asaCheckoutContinueReadinessMonitorStartedAt)
+                ? String(window.__asaCheckoutContinueReadinessMonitorStartedAt) : '',
               contactSurface: String(contactSurface),
               visibleContactFieldCount: String(contactFields.length)
             };

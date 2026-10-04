@@ -2398,6 +2398,13 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
           const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
           const norm = s => String(s || '').replace(/[\\u200b-\\u200f\\u2060]/g, '').replace(/\\s+/g, ' ').trim();
           const text = e => norm((e?.innerText || '') + ' ' + (e?.getAttribute?.('aria-label') || ''));
+          const findContinueButtons = () => [...document.querySelectorAll('button,a,[role="button"],input[type="submit"]')]
+            .filter(e => norm(e.getAttribute('aria-label')).includes('继续填写取货详情') ||
+              norm(e.value).includes('继续填写取货详情') || norm(e.textContent).includes('继续填写取货详情'))
+            .filter(visible)
+            .filter(e => norm(e.innerText || e.value || e.getAttribute('aria-label')) === '继续填写取货详情');
+          const continueButtonActionable = button => !!button && !button.disabled &&
+            button.getAttribute('aria-disabled') !== 'true' && getComputedStyle(button).pointerEvents !== 'none';
           if (!/^(www|secure\\d*\\.www)\\.apple\\.com\\.cn$/i.test(location.hostname) || !/^\\/shop\\/checkout(?:\\/|$)/i.test(location.pathname))
             return {state:'wrong_page'};
           if (window.__asaPickupFlowToken !== flowToken) {
@@ -2429,10 +2436,10 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
           // The continue result records a past click. Keep checking the live
           // route and contact fields after that click; Apple may update this
           // same document with a client-side navigation.
-          const hasContactFields = () => ['lastName','firstName','emailAddress','fullDaytimePhone'].some(name =>
+          const hasContactFields = () => ['lastName','firstName','emailAddress','fullDaytimePhone'].every(name =>
             [...document.querySelectorAll(`input[name="${name}"]`)].some(visible));
-          if (hasContactFields()) return {state:'contact_ready',fallback:window.__asaPickupStoreFallback === true,storeLabel:window.__asaPickupStoreLabel || ''};
-          if (/^PickupContact(?:-|$)/i.test(step)) return {state:'contact_loading',fallback:window.__asaPickupStoreFallback === true,storeLabel:window.__asaPickupStoreLabel || ''};
+          if (/^PickupContact(?:-|$)/i.test(step))
+            return {state:hasContactFields() ? 'contact_ready' : 'contact_loading',fallback:window.__asaPickupStoreFallback === true,storeLabel:window.__asaPickupStoreLabel || ''};
           const clickContinueOnce = (button,attemptKey,fallback,storeLabel,detectionSource='snapshot',reportImmediately=true) => {
             const continueKey = attemptKey + ':contact:' + flowToken;
             if (window.__asaPickupContactContinueAttempted === continueKey)
@@ -2440,6 +2447,9 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             const readyDetectedAt = performance.now();
             const storeChoiceClickedAt = window.__asaPickupStoreChoiceClickedAt;
             const storeSelectedAt = window.__asaPickupStoreSelectionObservedAt;
+            const checkoutReadiness = window.__asaCheckoutContinueReadiness;
+            const checkoutMonitorReadyToClickMS = checkoutReadiness?.timeOrigin === performance.timeOrigin && checkoutReadiness.step === step
+              ? Math.max(0,readyDetectedAt-checkoutReadiness.readyAt) : null;
             window.__asaPickupContactContinueAttempted = continueKey;
             const result = {
               state:'contact_continue_clicked',fallback,storeLabel,flowToken,step,
@@ -2449,6 +2459,8 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
               flowStartedToButtonReadyMS:Number.isFinite(window.__asaPickupFlowStartedAt) ? Math.max(0,readyDetectedAt-window.__asaPickupFlowStartedAt) : null,
               monitorStartedToButtonReadyMS:Number.isFinite(window.__asaPickupContinueObserverInstalledAt) ? Math.max(0,readyDetectedAt-window.__asaPickupContinueObserverInstalledAt) : null,
               buttonReadyDetectionSource:detectionSource,
+              checkoutMonitorReadyToClickMS,
+              checkoutMonitorReadyDetectionSource:checkoutReadiness?.source || null,
               buttonReadyDetectedToClickMS:0
             };
             window.__asaPickupContactContinueResult = result;
@@ -2487,17 +2499,16 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
               if (window.__asaPickupStoreSelectionObservedAt == null)
                 window.__asaPickupStoreSelectionObservedAt = performance.now();
               const currentStep = new URL(location.href).searchParams.get('_s') || '';
-              if (/^PickupContact(?:-|$)/i.test(currentStep) || hasContactFields()) {
+              if (/^PickupContact(?:-|$)/i.test(currentStep) || (!/^Fulfillment(?:-|$)/i.test(currentStep) && hasContactFields())) {
                 window.__asaPickupContinueObserver?.disconnect();
                 window.__asaPickupContinueObserverActive = false;
                 clearTimeout(window.__asaPickupContinueObserverTimer);
                 return false;
               }
-              const buttons = [...document.querySelectorAll('button,a,[role="button"],input[type="submit"]')].filter(visible)
-                .filter(e => norm(e.innerText || e.value || e.getAttribute('aria-label')) === '继续填写取货详情');
+              const buttons = findContinueButtons();
               if (buttons.length !== 1) return false;
               const next = buttons[0];
-              if (next.disabled || next.getAttribute('aria-disabled') === 'true') return false;
+              if (!continueButtonActionable(next)) return false;
               window.__asaPickupContinueObserver?.disconnect();
               window.__asaPickupContinueObserverActive = false;
               clearTimeout(window.__asaPickupContinueObserverTimer);
@@ -2527,11 +2538,12 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             const radio = fastSelectedStoreRadios[0];
             const fastControlSelector = 'label,[role="radio"],button,[role="listitem"],li,article,[data-autom]';
             const card = [...(radio.labels || [])].find(visible) || radio.closest(fastControlSelector) || radio;
-            const lines = String(card.innerText || '').split(/\\n+/).map(norm).filter(Boolean);
+            const cardVisibleText = String(card.innerText || '');
+            const lines = cardVisibleText.split(/\\n+/).map(norm).filter(Boolean);
             const appleLine = lines.find(value => /^Apple(?:\\s|$)/i.test(value)) || lines.find(value => /Apple/i.test(value)) || '';
             const storeLabel = appleLine.replace(/^\\d+\\s*/,'')
               .replace(/\\s+(?:目前不可取货|暂不可取货|不可取货|今天|明天|可取货|店内取货|pickup|delivery)(?:\\s.*)?$/i,'').trim();
-            const cardText = text(card);
+            const cardText = norm(cardVisibleText + ' ' + (card.getAttribute('aria-label') || ''));
             const unavailable = /(?:当前|目前|暂时)?不可取货|unavailable|sold\\s*out/i;
             const storeAvailable = cardText.length >= 4 && cardText.length <= 480 && /Apple/i.test(cardText) && /可取货|pickup/i.test(cardText) && !unavailable.test(cardText);
             const disabled = !!(card.disabled || card.getAttribute('aria-disabled') === 'true' || radio.disabled || radio.getAttribute('aria-disabled') === 'true');
@@ -2576,8 +2588,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             const fallback = window.__asaPickupStoreFallback === true;
             const storeLabel = window.__asaPickupStoreLabel || '首个可取货门店';
             const storeClickIssued = window.__asaPickupStoreSelectionActionKey === cachedKey;
-            const buttons = [...document.querySelectorAll('button,a,[role="button"],input[type="submit"]')].filter(visible)
-              .filter(e => norm(e.innerText || e.value || e.getAttribute('aria-label')) === '继续填写取货详情');
+            const buttons = findContinueButtons();
             if (buttons.length > 1) return {state:'contact_continue_ambiguous',fallback,storeLabel};
             const next = buttons[0] || null;
             if (!selectedInCard(cachedTarget)) {
@@ -2590,7 +2601,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
               installContinueObserver(cachedKey,fallback,storeLabel);
               return {state:'contact_continue_missing',fallback,storeLabel};
             }
-            if (next.disabled || next.getAttribute('aria-disabled') === 'true') {
+            if (!continueButtonActionable(next)) {
               installContinueObserver(cachedKey,fallback,storeLabel);
               return {state:'contact_continue_disabled',fallback,storeLabel};
             }
@@ -2619,7 +2630,8 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
           const shortName = norm(name).startsWith(norm(city)) ? norm(name).slice(norm(city).length).trim() : norm(name);
           const preferredLabel = /^Apple(?:\\s|$)/i.test(shortName) ? shortName : norm('Apple ' + shortName);
           const cardStoreName = card => {
-            const lines = String(card.innerText || '').split(/\\n+/).map(norm).filter(Boolean);
+            const cardVisibleText = String(card.innerText || '');
+            const lines = cardVisibleText.split(/\\n+/).map(norm).filter(Boolean);
             const line = lines.find(value => /^Apple(?:\\s|$)/i.test(value)) || lines.find(value => /Apple/i.test(value)) || '';
             return line.replace(/^\\d+\\s*/,'')
               .replace(/\\s+(?:目前不可取货|暂不可取货|不可取货|今天|明天|可取货|店内取货|pickup|delivery)(?:\\s.*)?$/i,'')
@@ -2635,15 +2647,14 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             if (!selectedInCard(target)) return {state:'waiting_store',fallback,storeLabel};
             if (window.__asaPickupStoreSelectionObservedAt == null)
               window.__asaPickupStoreSelectionObservedAt = performance.now();
-            const buttons = [...document.querySelectorAll('button,a,[role="button"],input[type="submit"]')].filter(visible)
-              .filter(e => norm(e.innerText || e.value || e.getAttribute('aria-label')) === '继续填写取货详情');
+            const buttons = findContinueButtons();
             if (buttons.length > 1) return {state:'contact_continue_ambiguous',fallback,storeLabel};
             const next = buttons[0] || null;
             if (!next) {
               installContinueObserver(attemptKey,fallback,storeLabel);
               return {state:'contact_continue_missing',fallback,storeLabel};
             }
-            if (next.disabled || next.getAttribute('aria-disabled') === 'true') {
+            if (!continueButtonActionable(next)) {
               installContinueObserver(attemptKey,fallback,storeLabel);
               return {state:'contact_continue_disabled',fallback,storeLabel};
             }
@@ -2722,18 +2733,23 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                   observed == "contact_ready" || observed == "contact_loading" else { return nil }
             let label = facts["storeLabel"] as? String ?? "首个可取货门店"
             let fallback = facts["fallback"] as? Bool == true
+            let contactFieldsReady = observed == "contact_ready"
             if fallback || fallbackWasLogged {
                 let chosenLabel = label.isEmpty ? fallbackStoreLabel : label
                 self.checkoutPickupStoreLabelForReview = chosenLabel.isEmpty || chosenLabel == "首个可取货门店" ? nil : chosenLabel
-                return "已回退选择第一个可取货门店 \(chosenLabel)，并进入取货联系人页面。"
+                return contactFieldsReady
+                    ? "已回退选择第一个可取货门店 \(chosenLabel)，并进入取货联系人页面。"
+                    : "已回退选择第一个可取货门店 \(chosenLabel)，已进入取货联系人步骤，页面字段仍在加载。"
             }
             let chosenLabel = label.isEmpty ? preferredStoreLabel : label
             if !chosenLabel.isEmpty && chosenLabel != "首个可取货门店" {
                 self.checkoutPickupStoreLabelForReview = chosenLabel
-                return "已选择首选门店并进入取货联系人页面：\(chosenLabel)"
+                return contactFieldsReady
+                    ? "已选择首选门店并进入取货联系人页面：\(chosenLabel)"
+                    : "已选择首选门店并进入取货联系人页面：\(chosenLabel)（页面字段仍在加载）"
             }
             self.checkoutPickupStoreLabelForReview = nil
-            return "已到取货联系人页面。"
+            return contactFieldsReady ? "已到取货联系人页面。" : "已进入取货联系人步骤，页面字段仍在加载。"
         }
         func waitForContactPageAfterContinue() async -> String {
             let waitStarted = ProcessInfo.processInfo.systemUptime
@@ -2759,7 +2775,8 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                 do {
                     let facts = try await browser.evaluate(expression) as? [String: Any] ?? [:]
                     if let reached = contactReachedMessage(facts) {
-                        logManagedDuration("继续填写取货详情后联系人页面就绪", started: waitStarted)
+                        let stage = facts["state"] as? String == "contact_ready" ? "联系人表单就绪" : "联系人步骤出现但字段仍在加载"
+                        logManagedDuration("继续填写取货详情后\(stage)", started: waitStarted)
                         return reached
                     }
                     if facts["state"] as? String == "wrong_page" {
@@ -2781,7 +2798,8 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             if browser.isConnected,
                let facts = try? await browser.evaluate(expression) as? [String: Any],
                let reached = contactReachedMessage(facts) {
-                logManagedDuration("继续填写取货详情后联系人页面就绪", started: waitStarted)
+                let stage = facts["state"] as? String == "contact_ready" ? "联系人表单就绪" : "联系人步骤出现但字段仍在加载"
+                logManagedDuration("继续填写取货详情后\(stage)", started: waitStarted)
                 return reached
             }
             return "已点击“继续填写取货详情”，但 Apple 在 30 秒内未确认进入取货联系人页面；程序没有重复点击或继续填写。请检查专用浏览器页面。"
@@ -2791,7 +2809,8 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                 let facts = try await browser.evaluate(expression) as? [String: Any] ?? [:]
                 if let reached = contactReachedMessage(facts) {
                     if let clickedAt = pickupDetailsContinueClickedAt {
-                        logManagedDuration("继续填写取货详情后联系人页面就绪", started: clickedAt)
+                        let stage = facts["state"] as? String == "contact_ready" ? "联系人表单就绪" : "联系人步骤出现但字段仍在加载"
+                        logManagedDuration("继续填写取货详情后\(stage)", started: clickedAt)
                     }
                     return reached
                 }
@@ -2851,6 +2870,8 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                     let storeSelectedToReadyMS = facts["storeSelectedToButtonReadyMS"] as? Double
                     let flowStartedToReadyMS = facts["flowStartedToButtonReadyMS"] as? Double
                     let monitorStartedToReadyMS = facts["monitorStartedToButtonReadyMS"] as? Double
+                    let checkoutMonitorReadyToClickMS = facts["checkoutMonitorReadyToClickMS"] as? Double
+                    let checkoutMonitorReadyDetectionSource = facts["checkoutMonitorReadyDetectionSource"] as? String ?? "unknown"
                     let detectionSource = facts["buttonReadyDetectionSource"] as? String ?? "unknown"
                     if fallback {
                         fallbackStoreLabel = label
@@ -2864,6 +2885,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                     }
                     var readinessDetails = ["pageStep":pageStep,"storeLabel":label]
                     readinessDetails["buttonReadyDetectionSource"] = detectionSource
+                    readinessDetails["checkoutMonitorReadyDetectionSource"] = checkoutMonitorReadyDetectionSource
                     if let flowStartedToReadyMS {
                         readinessDetails["flowStartedToButtonReadyMS"] = String(format:"%.1f", flowStartedToReadyMS)
                     }
@@ -2880,6 +2902,12 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                     if let buttonReadyDelayMS {
                         readinessDetails["buttonReadyDetectedToClickMS"] = String(format:"%.1f", buttonReadyDelayMS)
                         log(String(format:"[执行耗时] 按钮可用至触发点击：%.1f ms", buttonReadyDelayMS))
+                    }
+                    if let checkoutMonitorReadyToClickMS {
+                        readinessDetails["checkoutMonitorReadyToClickMS"] = String(format:"%.1f", checkoutMonitorReadyToClickMS)
+                        log(String(format:"[执行耗时] Fulfillment 页面前置监控确认可用至触发点击：%.1f ms；识别方式：%@", checkoutMonitorReadyToClickMS, checkoutMonitorReadyDetectionSource))
+                    } else {
+                        readinessDetails["checkoutMonitorReadyToClickMS"] = "unavailable"
                     }
                     recordTask("pickup_continue_button_ready_clicked", readinessDetails)
                     if let storeClickToReadyMS {
