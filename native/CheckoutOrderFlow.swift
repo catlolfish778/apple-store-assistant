@@ -19,20 +19,17 @@ struct CheckoutOrderFlowOutcome {
 final class CheckoutOrderFlow {
     private let browser: BrowserController
     private let paymentMethod: CheckoutPaymentMethod
-    private let expectedPickupStoreLabel: String?
     private let expectedPrice: Double
     private let priceLimit: Double
     private let prepareSubmission: () throws -> Void
     private let progress: (String) -> Void
 
     init(browser: BrowserController, paymentMethod: CheckoutPaymentMethod,
-         expectedPickupStoreLabel: String?,
          expectedPrice: Double, priceLimit: Double,
          prepareSubmission: @escaping () throws -> Void,
          progress: @escaping (String) -> Void = { _ in }) {
         self.browser = browser
         self.paymentMethod = paymentMethod
-        self.expectedPickupStoreLabel = expectedPickupStoreLabel
         self.expectedPrice = expectedPrice
         self.priceLimit = priceLimit
         self.prepareSubmission = prepareSubmission
@@ -82,11 +79,7 @@ final class CheckoutOrderFlow {
             guard reviewReached else {
                 return stopped("“检查订单”已点击，但未能确认进入 Review；程序不会重复点击。请核对专用浏览器。")
             }
-            progress("已进入 Review，正在核对付款方式、取货门店和总金额…")
-            guard let pickupStore = expectedPickupStoreLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !pickupStore.isEmpty else {
-                return stopped("本次没有记录到已确认的取货门店；程序停在 Review 页面，没有提交订单，请手动核对。")
-            }
+            progress("已进入 Review，正在核对付款方式和总金额…")
             let review = try await reviewFacts()
             guard review["state"] as? String == "review_ready" else {
                 return stopped(review["message"] as? String ?? "Review 页面信息未能核实；程序没有提交订单。")
@@ -306,13 +299,12 @@ final class CheckoutOrderFlow {
         let method = paymentMethod == .alipay ? "alipay" : "wechat"
         let expected = expectedPrice
         let limit = priceLimit
-        let pickupStore = expectedPickupStoreLabel ?? ""
-        return try await browser.evaluate(Self.reviewFactsScript(method: method, expectedPrice: expected, priceLimit: limit, expectedPickupStoreLabel: pickupStore)) as? [String: Any] ?? [:]
+        return try await browser.evaluate(Self.reviewFactsScript(method: method, expectedPrice: expected, priceLimit: limit)) as? [String: Any] ?? [:]
     }
 
     private func placeOrderExpression() -> String {
         let method = paymentMethod == .alipay ? "alipay" : "wechat"
-        return Self.placeOrderScript(method: method, expectedPrice: expectedPrice, priceLimit: priceLimit, expectedPickupStoreLabel: expectedPickupStoreLabel ?? "")
+        return Self.placeOrderScript(method: method, expectedPrice: expectedPrice, priceLimit: priceLimit)
     }
 
     private static let pageFactsExpression = """
@@ -385,23 +377,15 @@ final class CheckoutOrderFlow {
         """
     }
 
-    private static func reviewFactsScript(method: String, expectedPrice: Double, priceLimit: Double, expectedPickupStoreLabel: String) -> String {
+    private static func reviewFactsScript(method: String, expectedPrice: Double, priceLimit: Double) -> String {
         let expected = String(format: "%.2f", expectedPrice)
         let limit = String(format: "%.2f", priceLimit)
-        let pickupStoreLiteral = (try? JSONEncoder().encode(expectedPickupStoreLabel)).map { String(decoding: $0, as: UTF8.self) } ?? "\"\""
         let methodPattern = method == "alipay" ? "/支付宝|alipay/i" : "/微信支付|微信|wechat\\s*pay/i"
         return """
         (() => {
           const facts = \(pageFactsExpression);
           if (facts.stage !== 'review') return {state:'wrong_page',message:'未处于 Apple Review 页面'};
           const text = (document.body?.innerText || '').replace(/\\s+/g,' ').trim();
-          const normalizeStore = value => String(value || '').replace(/[\\u200b-\\u200f\\u2060]/g,'').replace(/\\s+/g,'').toLowerCase();
-          const expectedStore = normalizeStore(\(pickupStoreLiteral));
-          const pickupLines = String(document.body?.innerText || '').split(/\\n+/).map(line => line.trim()).filter(Boolean);
-          const pickupStoreMatches = expectedStore.length > 0 && pickupLines.some((line,index) =>
-            normalizeStore(line).includes(expectedStore) &&
-            pickupLines.slice(Math.max(0,index-3),Math.min(pickupLines.length,index+4)).some(context => /取货|pickup/i.test(context))
-          );
           // Review pages may list several supported payment methods at once.
           // Only require the configured method to be present; unrelated options
           // elsewhere in the page must not be treated as a selection conflict.
@@ -414,7 +398,6 @@ final class CheckoutOrderFlow {
           const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
           const buttons = [...document.querySelectorAll('button,[role="button"],input[type="submit"],a')].filter(visible)
             .filter(e => String(e.innerText || e.value || e.getAttribute('aria-label') || '').replace(/\\s+/g,' ').trim() === '立即下单');
-          if (!pickupStoreMatches) return {state:'pickup_mismatch',message:'Review 页面无法确认本次选择的取货门店；程序没有提交订单'};
           if (!methodMatches) return {state:'payment_mismatch',message:'Review 页面未能确认设置的付款方式'};
           if (!amountMatches) return {state:'amount_mismatch',message:'Review 页面总金额与购买计划价格不一致或无法读取'};
           if (buttons.length !== 1) return {state:'order_button_ambiguous',message:'无法唯一确认 Review 页的“立即下单”按钮'};
@@ -424,10 +407,9 @@ final class CheckoutOrderFlow {
         """
     }
 
-    private static func placeOrderScript(method: String, expectedPrice: Double, priceLimit: Double, expectedPickupStoreLabel: String) -> String {
+    private static func placeOrderScript(method: String, expectedPrice: Double, priceLimit: Double) -> String {
         let expected = String(format: "%.2f", expectedPrice)
         let limit = String(format: "%.2f", priceLimit)
-        let pickupStoreLiteral = (try? JSONEncoder().encode(expectedPickupStoreLabel)).map { String(decoding: $0, as: UTF8.self) } ?? "\"\""
         let methodPattern = method == "alipay" ? "/支付宝|alipay/i" : "/微信支付|微信|wechat/i"
         return """
         (() => {
@@ -435,13 +417,6 @@ final class CheckoutOrderFlow {
           if (facts.stage !== 'review') return {state:'review_changed',message:'Review 页面已变化，没有发出下单操作'};
           if (window.__asaPlaceOrderAttempted) return {state:'pending'};
           const text = (document.body?.innerText || '').replace(/\\s+/g,' ').trim();
-          const normalizeStore = value => String(value || '').replace(/[\\u200b-\\u200f\\u2060]/g,'').replace(/\\s+/g,'').toLowerCase();
-          const expectedStore = normalizeStore(\(pickupStoreLiteral));
-          const pickupLines = String(document.body?.innerText || '').split(/\\n+/).map(line => line.trim()).filter(Boolean);
-          const pickupStoreMatches = expectedStore.length > 0 && pickupLines.some((line,index) =>
-            normalizeStore(line).includes(expectedStore) &&
-            pickupLines.slice(Math.max(0,index-3),Math.min(pickupLines.length,index+4)).some(context => /取货|pickup/i.test(context))
-          );
           // The Review page can contain labels for multiple payment options.
           // Do not reject the configured option just because other labels exist.
           const methodMatches = \(methodPattern).test(text);
@@ -449,8 +424,6 @@ final class CheckoutOrderFlow {
           const total = totalLine ? Number(totalLine[1].replace(/,/g,'')) : NaN;
           const expected = Number('\(expected)');
           const limit = Number('\(limit)');
-          if (!pickupStoreMatches)
-            return {state:'review_changed',message:'点击前未能确认 Review 页的取货门店与本次选择一致，没有发出下单操作'};
           if (!methodMatches || !Number.isFinite(total) || Math.abs(total-expected) >= 0.01 || (limit > 0 && total > limit + 0.01))
             return {state:'review_changed',message:'Review 页面未能确认设置的付款方式或总金额不符，没有发出下单操作'};
           const visible = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';

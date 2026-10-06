@@ -31,7 +31,6 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
     var automationTask: Task<Void, Never>?
     var automationPhase: AutomationPhase?
     var checkoutHandoffRunState = "manual"
-    var checkoutPickupStoreLabelForReview: String?
     var manualBrowserOperations = 0
     var managedBrowserButton: NSButton!
     var accountCheckButton: NSButton!
@@ -1932,10 +1931,6 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
 
     func completeCheckoutAtHandoff(_ settings: PickupSettings) async -> String {
         checkoutHandoffRunState = "manual"
-        let configuredPickupStoreLabel = pickupDirectory?.stores.first(where: {
-            $0.storeNumber == settings.preferredStoreNumber && $0.city == settings.city
-        })?.name
-        checkoutPickupStoreLabelForReview = settings.autoSelectPreferredStore ? nil : configuredPickupStoreLabel
         guard let browser, browser.isConnected else {
             return "已到 Apple 结账页，但专用浏览器连接已断开；请在官网手动核对取货联系人和发票。"
         }
@@ -2272,7 +2267,6 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
                     let flow = CheckoutOrderFlow(
                         browser: browser,
                         paymentMethod: method,
-                        expectedPickupStoreLabel: checkoutPickupStoreLabelForReview,
                         expectedPrice: run?.plan.variant.price ?? 0,
                         priceLimit: run?.plan.maxTotal ?? 0,
                         prepareSubmission: { [weak self] in
@@ -2736,19 +2730,16 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             let contactFieldsReady = observed == "contact_ready"
             if fallback || fallbackWasLogged {
                 let chosenLabel = label.isEmpty ? fallbackStoreLabel : label
-                self.checkoutPickupStoreLabelForReview = chosenLabel.isEmpty || chosenLabel == "首个可取货门店" ? nil : chosenLabel
                 return contactFieldsReady
                     ? "已回退选择第一个可取货门店 \(chosenLabel)，并进入取货联系人页面。"
                     : "已回退选择第一个可取货门店 \(chosenLabel)，已进入取货联系人步骤，页面字段仍在加载。"
             }
             let chosenLabel = label.isEmpty ? preferredStoreLabel : label
             if !chosenLabel.isEmpty && chosenLabel != "首个可取货门店" {
-                self.checkoutPickupStoreLabelForReview = chosenLabel
                 return contactFieldsReady
                     ? "已选择首选门店并进入取货联系人页面：\(chosenLabel)"
                     : "已选择首选门店并进入取货联系人页面：\(chosenLabel)（页面字段仍在加载）"
             }
-            self.checkoutPickupStoreLabelForReview = nil
             return contactFieldsReady ? "已到取货联系人页面。" : "已进入取货联系人步骤，页面字段仍在加载。"
         }
         func waitForContactPageAfterContinue() async -> String {
