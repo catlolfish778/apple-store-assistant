@@ -1,5 +1,15 @@
 # 验证记录
 
+## 2026-10-16 源码公开前验收
+
+- `bash native/test-automation.sh` 通过：新增 CheckoutProfile 启动策略测试、正式协调器 17 场景、Domain、BrowserController、TaskRecording、隔离浏览器联调、原生构建和 App 离线自测。
+- `python3 -m unittest discover -v` 通过：25 项测试。
+- 新增回归测试先复现隔离启动仍调用保存资料读取器的问题，再验证修复后隔离模式不调用读取器，正常启动仍保留资料加载及错误处理。进程采样曾确认旧 App 自测卡在钥匙串 `SecItemCopyMatching`；修复后 App 自测正常完成。
+- `--self-test` 与 `--preview` 使用隔离存储，并跳过真实联系人/发票钥匙串资料读取。App 自测仍只演练本地流程；不访问真实 Apple 购物袋或创建订单。
+- README 与教程的相对链接、流程 SVG 的 XML 结构检查通过。Git 历史中的 96 个文本版本未命中本次扫描的私钥、常见访问 Token、个人邮箱及用户名目录等模式；这是有限的静态检查，不是独立安全审计。
+
+当前可选结账自动化能够尝试创建待付款订单，实际付款由用户完成。Review 只核对付款方式标签和金额，不强制匹配门店名称。真实开售完整链路、成功率及高峰网络表现仍未验收，旧演练数据不代表这些指标。
+
 ## 2026-09-27 一键托管 0.3
 
 `bash native/test-automation.sh` 已通过：正式协调器 17 个确定性场景、DomainTests、BrowserControllerTests、TaskRecordingTests、隔离 Edge 中完整协调器 + 正式浏览器适配层、原生 App 隔离数据自测。

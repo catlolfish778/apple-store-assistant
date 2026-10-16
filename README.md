@@ -94,3 +94,9 @@ python3 -m apple_store_assistant run -c config.example.json
 ```
 
 旧 CLI 的配置字段和限制见 [APPLE_OFFICIAL_DATA_AND_CHECKOUT_BOUNDARIES.md](APPLE_OFFICIAL_DATA_AND_CHECKOUT_BOUNDARIES.md)。
+
+## 开发资料
+
+[贡献说明](CONTRIBUTING.md) · [架构与付款方式扩展](ARCHITECTURE.md) · [更新记录](CHANGELOG.md) · [验证记录](native/VALIDATION.md) · [第三方资料声明](THIRD_PARTY_NOTICES.md)
+
+历史设计与排查资料：[一键托管设计](AUTOMATION_UPGRADE.md)、[实施路线图](IMPLEMENTATION_ROADMAP.md)、[问题清单](PROBLEM_INVENTORY.md)、[浏览器登录基线](BROWSER_LOGIN_BASELINE.md)、[参考项目评估](REFERENCE_EVALUATION.md)和[旧版 macOS 原型](MAC_APP_README.md)。这些记录包含当时的状态；当前使用流程以本页和用户教程为准。
