@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="470" viewBox="0 0 1440 470" role="img" aria-labelledby="title desc">
+  <title id="title">Apple Store Assistant 完整使用流程</title>
+  <desc id="desc">建立机型计划，设置取货联系人和发票，选择支付方式，设置时间并托管，最后由用户完成实际支付。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f3f7ff"/><stop offset="1" stop-color="#f8f6ff"/></linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#25406b" flood-opacity=".09"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#8da4c8"/></marker>
+  </defs>
+  <rect width="1440" height="470" rx="28" fill="url(#bg)"/>
+  <text x="54" y="68" fill="#172b4d" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Noto Sans CJK SC',sans-serif" font-size="29" font-weight="700">购买准备助手：五步了解流程</text>
+  <text x="54" y="102" fill="#64748b" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Noto Sans CJK SC',sans-serif" font-size="16">流程示意，非实测录屏 · 真实开售完整链路尚未验证</text>
+  <g stroke="#8da4c8" stroke-width="3" fill="none" marker-end="url(#arrow)">
+    <path d="M292 265H326"/><path d="M564 265H598"/><path d="M836 265H870"/><path d="M1108 265H1142"/>
+  </g>
+  <g filter="url(#shadow)" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Noto Sans CJK SC',sans-serif">
+    <g transform="translate(44 145)">
+      <rect width="248" height="238" rx="20" fill="#fff"/>
+      <circle cx="31" cy="34" r="17" fill="#3478f6"/><text x="31" y="40" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">1</text>
+      <text x="58" y="40" fill="#183153" font-size="20" font-weight="700">录入机型</text>
+      <text x="22" y="88" fill="#3f526e" font-size="15">打开 Apple 官方购买页</text>
+      <text x="22" y="117" fill="#3f526e" font-size="15">读取规格并选完整</text>
+      <text x="22" y="146" fill="#3f526e" font-size="15">核对 part number</text>
+      <rect x="20" y="177" width="207" height="38" rx="10" fill="#edf4ff"/>
+      <text x="32" y="201" fill="#2462c5" font-size="14" font-weight="600">每个规格组合单独建计划</text>
+    </g>
+    <g transform="translate(316 145)">
+      <rect width="248" height="238" rx="20" fill="#fff"/>
+      <circle cx="31" cy="34" r="17" fill="#20a67a"/><text x="31" y="40" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">2</text>
+      <text x="58" y="40" fill="#183153" font-size="20" font-weight="700">取货资料</text>
+      <text x="22" y="88" fill="#3f526e" font-size="15">城市与首选 Apple 门店</text>
+      <text x="22" y="117" fill="#3f526e" font-size="15">联系人、邮箱、手机号</text>
+      <text x="22" y="146" fill="#3f526e" font-size="15">确认取货姓名与证件一致</text>
+      <rect x="20" y="177" width="207" height="38" rx="10" fill="#eaf8f2"/>
+      <text x="32" y="201" fill="#16845f" font-size="14" font-weight="600">门店有货以结账页为准</text>
+    </g>
+    <g transform="translate(588 145)">
+      <rect width="248" height="238" rx="20" fill="#fff"/>
+      <circle cx="31" cy="34" r="17" fill="#8a60e8"/><text x="31" y="40" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">3</text>
+      <text x="58" y="40" fill="#183153" font-size="20" font-weight="700">发票与支付</text>
+      <text x="22" y="88" fill="#3f526e" font-size="15">选择个人 / 公司 / 专票</text>
+      <text x="22" y="117" fill="#3f526e" font-size="15">填写对应发票资料并保存</text>
+      <text x="22" y="146" fill="#3f526e" font-size="15">选择支付宝或微信</text>
+      <rect x="20" y="177" width="207" height="38" rx="10" fill="#f2edff"/>
+      <text x="32" y="201" fill="#6945bd" font-size="14" font-weight="600">支付账号与支付密码不录入</text>
+    </g>
+    <g transform="translate(860 145)">
+      <rect width="248" height="238" rx="20" fill="#fff"/>
+      <circle cx="31" cy="34" r="17" fill="#e69b25"/><text x="31" y="40" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">4</text>
+      <text x="58" y="40" fill="#183153" font-size="20" font-weight="700">设时间并托管</text>
+      <text x="22" y="88" fill="#3f526e" font-size="15">确认专用 Edge 与账号状态</text>
+      <text x="22" y="117" fill="#3f526e" font-size="15">设定开售时间和执行窗口</text>
+      <text x="22" y="146" fill="#3f526e" font-size="15">点击“一键托管”</text>
+      <rect x="20" y="177" width="207" height="38" rx="10" fill="#fff5e5"/>
+      <text x="32" y="201" fill="#a66b10" font-size="14" font-weight="600">无法确认结果时交给你处理</text>
+    </g>
+    <g transform="translate(1132 145)">
+      <rect width="264" height="238" rx="20" fill="#fff"/>
+      <circle cx="31" cy="34" r="17" fill="#de5a68"/><text x="31" y="40" text-anchor="middle" fill="#fff" font-size="16" font-weight="700">5</text>
+      <text x="58" y="40" fill="#183153" font-size="20" font-weight="700">核对并付款</text>
+      <text x="22" y="88" fill="#3f526e" font-size="15">请你核对商品、门店与金额</text>
+      <text x="22" y="117" fill="#3f526e" font-size="15">Apple 可确认生成待付款订单</text>
+      <text x="22" y="146" fill="#3f526e" font-size="15">用户自行完成实际支付</text>
+      <rect x="20" y="177" width="223" height="38" rx="10" fill="#fff0f1"/>
+      <text x="32" y="201" fill="#b33c4b" font-size="14" font-weight="600">下单 ≠ 付款，也不保证有货</text>
+    </g>
+  </g>
+  <text x="54" y="430" fill="#718096" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Noto Sans CJK SC',sans-serif" font-size="14">取货、联系人、发票和支付偏好会跨机型计划复用；切换计划后，请重新确认是否适用于本次购买。</text>
+</svg>

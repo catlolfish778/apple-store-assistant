@@ -51,7 +51,7 @@ Apple 密码、支付账号和支付凭据不进入 App 的配置、运行状态
 
 ### 4. 购买流程分级
 
-浏览器模块在开售前准备登录会话、取货信息和付款方式，并在开售时通过同一个专用浏览器会话打开准确商品页、加入购物袋和进入结账。若用户明确开启结账自动化，程序会填写已保存的联系人/发票资料，核对商品、取货门店、付款方式和金额，再最多提交一次订单并等待待付款订单确认。验证码、二次验证和实际付款仍由用户完成。购物袋或库存查询结果不视为库存锁定。
+浏览器模块在开售前准备登录会话、取货信息和付款方式，并在开售时通过同一个专用浏览器会话打开准确商品页、加入购物袋和进入结账。若用户明确开启结账自动化，程序会填写已保存的联系人/发票资料，在购物袋阶段核对商品与数量、在 Review 阶段核对付款方式标签和金额，再最多提交一次订单（当前 Review 不强制匹配取货门店名称，用户须亲自确认）并等待待付款订单确认。验证码、二次验证和实际付款仍由用户完成。购物袋或库存查询结果不视为库存锁定。
 
 ### 5. 配置以官方变体为准
 
@@ -79,8 +79,8 @@ Apple 密码、支付账号和支付凭据不进入 App 的配置、运行状态
 | --- | --- | --- |
 | [`native/Domain.swift`](native/Domain.swift) 的 `CheckoutPaymentMethod` | 付款方式的稳定 `rawValue` 和用户可见名称；`PickupSettings.paymentMethod` 保存所选值 | 新增枚举项和名称；保持已有 `alipay`、`wechat` 原值不变，确保旧设置仍可读取 |
 | [`native/App.swift`](native/App.swift) 的“付款与下单”下拉框、`changeCheckoutPaymentMethod()`, `arm()` 校验及 `payment_ready` 分支 | 显示可选方式、保存选择、阻止未选择时启动自动结账，并把方式传给结账流程 | 加入可选项，更新只列支付宝/微信的提示语和错误信息；验证新选项经保存/重启后仍能正确选择 |
-| [`native/CheckoutOrderFlow.swift`](native/CheckoutOrderFlow.swift) 的 `paymentSelectionExpression()`, `paymentStateExpression()`, `reviewFacts()` 和 `placeOrderExpression()` | 识别并选择 Apple 付款单选项、确认选中状态，并在 Review 与提交前再次核验 | 增加该方式在 Apple 页面上的唯一识别条件、DOM 标记/Token、可见标签、选择后状态和 Review 文案匹配规则，并保留金额/门店复核与单次提交保护 |
-| 结账页面 fixture 和自动化验证 | 检查页面变化时安全停止，不重复点击 | 为新方式覆盖选项缺失/重复、点击后未选中、Review 不匹配、金额/门店不符、延迟或结果未知等情况；无法唯一识别时必须停止。当前测试脚本没有单独的 `CheckoutOrderFlow` 付款页面测试，新增方式时应补上隔离页面 fixture 和针对性验证 |
+| [`native/CheckoutOrderFlow.swift`](native/CheckoutOrderFlow.swift) 的 `paymentSelectionExpression()`, `paymentStateExpression()`, `reviewFacts()` 和 `placeOrderExpression()` | 识别并选择 Apple 付款单选项、确认选中状态，并在 Review 与提交前再次核验 | 增加该方式在 Apple 页面上的唯一识别条件、DOM 标记/Token、可见标签、选择后状态和 Review 文案匹配规则，并保留金额复核与单次提交保护；当前没有 Review 门店名称强制匹配，新增适配不能假设已有该保护 |
+| 结账页面 fixture 和自动化验证 | 检查页面变化时安全停止，不重复点击 | 为新方式覆盖选项缺失/重复、点击后未选中、Review 不匹配、金额不符、延迟或结果未知；如增加门店匹配能力，还需覆盖门店不符等情况；无法唯一识别时必须停止。当前测试脚本没有单独的 `CheckoutOrderFlow` 付款页面测试，新增方式时应补上隔离页面 fixture 和针对性验证 |
 
 **特别注意：**`CheckoutOrderFlow.swift` 目前多处使用“支付宝则 `alipay`，否则按微信 `wechat` 处理”的二选一映射。加入第三种方式前必须先改成显式、可审查的映射；否则新选项可能被错误地当作微信处理。付款方式字符串保存在 `pickup-settings.json`，新增/改名时要保留旧 `rawValue` 的兼容，并让未知值停在“需要重新选择”，不能静默回退到其他方式。
 
