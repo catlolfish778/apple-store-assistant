@@ -31,6 +31,7 @@ struct AutomationObservation {
     var progress = "waiting" // waiting / add_ready / acknowledged / attach / bag / checkout
     var bag = "unknown" // empty / confirmed / conflict / unknown
     var bagDetails: [String: String] = [:]
+    var checkoutDetails: [String: String] = [:]
     var issuedKind: String?
 }
 
@@ -86,6 +87,7 @@ final class ManagedAutomation {
     private var lastFacts = ""
     private var lastBagDetails: [String: String]?
     private var lastCheckoutClickReport = ""
+    private var lastCheckoutDetails = ""
     private let now: () -> TimeInterval
     private let sleep: (TimeInterval) async throws -> Void
     private let persist: (AutomationCheckpoint) throws -> Void
@@ -391,6 +393,13 @@ final class ManagedAutomation {
         case .awaitingCheckout:
             let facts = try await browser.observeProgress()
             try checkActive()
+            if !facts.checkoutDetails.isEmpty {
+                let signature = facts.checkoutDetails.keys.sorted().map { "\($0)=\(facts.checkoutDetails[$0] ?? "")" }.joined(separator: "|")
+                if signature != lastCheckoutDetails {
+                    lastCheckoutDetails = signature
+                    notify("结账按钮监控状态", facts.checkoutDetails)
+                }
+            }
             if facts.progress == "checkout" {
                 pending = nil; transition(.handoff); try checkpoint()
             } else {
@@ -402,7 +411,7 @@ final class ManagedAutomation {
                 if pending == nil && !facts.requiresLogin && !facts.challenge {
                     try await attemptCheckout()
                 } else {
-                    try await wait(0.2)
+                    try await wait(0.1)
                 }
             }
         default: throw CancellationError()

@@ -2,6 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build/native
+xcrun swiftc -swift-version 5 -framework Security native/Domain.swift native/CheckoutProfile.swift native/CheckoutProfileTests.swift -o build/native/checkout-profile-tests
+build/native/checkout-profile-tests
 xcrun swiftc -swift-version 5 native/Domain.swift native/ManagedAutomation.swift native/ManagedAutomationTests.swift -o build/native/automation-tests
 build/native/automation-tests
 xcrun swiftc -swift-version 5 native/Domain.swift native/DomainTests.swift -o build/native/domain-tests

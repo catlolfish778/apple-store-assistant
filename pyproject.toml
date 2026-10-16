@@ -8,8 +8,8 @@ version = "0.1.0"
 description = "Local Apple Store availability monitor and manual checkout assistant"
 requires-python = ">=3.11"
 readme = "README.md"
-license = {text = "Private project; review third-party licenses before distribution"}
-authors = [{name = "Local project"}]
+license = {text = "GPL-3.0-only"}
+authors = [{name = "catlolfish778"}]
 
 [project.scripts]
 apple-store-assistant = "apple_store_assistant.cli:main"

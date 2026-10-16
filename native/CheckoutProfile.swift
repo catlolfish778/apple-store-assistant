@@ -65,6 +65,13 @@ struct SecureCheckoutProfile: Codable, Equatable {
     }
 }
 
+enum CheckoutProfileLaunchPolicy {
+    static func load(isolated: Bool, from saved: () throws -> SecureCheckoutProfile) rethrows -> SecureCheckoutProfile {
+        guard !isolated else { return SecureCheckoutProfile() }
+        return try saved()
+    }
+}
+
 struct CheckoutProfileKeychain {
     private let service = "local.applestore.assistant.native.checkout-profile"
     private let account = "primary"

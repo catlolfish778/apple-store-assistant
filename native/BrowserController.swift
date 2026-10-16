@@ -129,7 +129,10 @@ final class BrowserController: NSObject {
         lastAttachFailure = nil
         var startupSucceeded = false
         defer {
-            if !startupSucceeded { _ = stop(closeManagedBrowser: isolatedProfileURL == nil) }
+            // A startup failure should detach control state without treating
+            // it as proof that the browser process is unsafe. Preserve the
+            // managed session so the user can inspect it and retry attaching.
+            if !startupSucceeded { _ = stop(closeManagedBrowser: false) }
         }
 
         let browser = try findBrowser()
@@ -141,6 +144,9 @@ final class BrowserController: NSObject {
                 attachedToExisting = true
                 startupSucceeded = true
                 return existing
+            }
+            if let lastAttachFailure {
+                throw BrowserControllerError.protocolError("接管现有专用浏览器失败；已保留浏览器窗口供检查：\(lastAttachFailure)")
             }
             if let owner = verifiedManagedBrowserProfilePID(profile) {
                 onDiagnostic?("专用浏览器无法接管，正在只重启专用实例（进程 \(owner)）")
@@ -276,8 +282,15 @@ final class BrowserController: NSObject {
         let confirmedURL = stringResult(result) ?? targetURL
         targetURL = confirmedURL
         if let initialURL, targetURL == "about:blank" {
-            _ = try await command("Page.enable")
-            _ = try await command("Page.navigate", ["url": initialURL.absoluteString])
+            let destination = initialURL.host.map { "\($0)\(initialURL.path)" } ?? initialURL.path
+            onDiagnostic?("专用浏览器目标页仍为空白页，正在导航到 \(destination)")
+            do {
+                _ = try await command("Page.enable")
+                _ = try await command("Page.navigate", ["url": initialURL.absoluteString])
+            } catch {
+                onDiagnostic?("专用浏览器空白页导航失败；窗口已保留：\(error.localizedDescription)")
+                throw error
+            }
             targetURL = initialURL.absoluteString
         }
         isConnected = true

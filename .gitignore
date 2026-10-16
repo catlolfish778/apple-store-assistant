@@ -16,3 +16,8 @@ reference_projects/
 
 # Contains machine-specific absolute paths; sanitize before sharing
 /docs/APP_FLOW_GUIDE_2026-09-27.md
+
+# Private recordings, screenshots, marketing drafts, and unimplemented sales plans
+/视频材料/
+/PAYMENT_AND_ACCESS_PLAN.md
+/docs/images/payment-entitlement-flow.svg
