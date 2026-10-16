@@ -156,7 +156,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
             guard lockFD >= 0, flock(lockFD, LOCK_EX | LOCK_NB) == 0 else { throw AppError("另一个购买助手已在运行，请使用已有窗口") }
             saved = try store.read("plans.json", as: Saved.self) ?? Saved()
             pickupSettings = try store.read("pickup-settings.json", as: PickupSettings.self) ?? PickupSettings()
-            do { checkoutProfile = try checkoutProfileKeychain.load() }
+            do { checkoutProfile = try CheckoutProfileLaunchPolicy.load(isolated: isolated, from: checkoutProfileKeychain.load) }
             catch { checkoutProfileLoadError = error.localizedDescription }
             let hasSavedContact = !checkoutProfile.surname.isEmpty && !checkoutProfile.givenName.isEmpty &&
                 !checkoutProfile.email.isEmpty && !checkoutProfile.phone.isEmpty && checkoutProfile.contactNameConfirmed
@@ -3154,7 +3154,7 @@ final class StoreApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKU
         return .terminateNow
     }
     let welcomeHTML = """
-    <html lang="zh"><meta charset="utf-8"><style>body{font:18px -apple-system;background:#f5f5f7;color:#1d1d1f;margin:12%;line-height:1.7}h1{font-size:42px;letter-spacing:-2px}small{color:#6e6e73}</style><small>APPLE STORE ASSISTANT</small><h1>你的商品。你的时间。</h1><p>专用 Edge 正在打开 Apple 账号页。Apple 要求登录时，App 会尝试调用专用浏览器已保存的登录信息，并只在页面确认密码已填入后提交一次；App 不读取或保存密码。若没有可用的已保存密码，或 Apple 要求验证码/身份验证，请在该浏览器完成。</p><p>退出 App 后专用 Edge 会继续运行，下次启动时自动接管，以保留 Apple Store 登录会话。若退出 Edge 或 Apple 要求重新验证，仍需按官网提示完成。</p><p>账号、商品与购买状态会显示在左侧。到达结账页后，请在专用浏览器核对信息并由你决定是否付款。</p><small>专用浏览器与日常浏览器资料隔离；无需额外开启 macOS 自动化或辅助功能权限。</small></html>
+    <html lang="zh"><meta charset="utf-8"><style>body{font:18px -apple-system;background:#f5f5f7;color:#1d1d1f;margin:12%;line-height:1.7}h1{font-size:42px;letter-spacing:-2px}small{color:#6e6e73}</style><small>APPLE STORE ASSISTANT</small><h1>你的商品。你的时间。</h1><p>专用 Edge 正在打开 Apple 账号页。当前版本会尝试触发 Edge 自带的已保存凭据填充；页面脚本会检查账号是否匹配、密码栏是否非空，然后至多提交一次登录。密码字符串不会作为脚本结果返回给 App 原生侧，也不会写入计划或日志；但 App 可通过本机调试接口控制专用浏览器，因此不能承诺技术上无法接触登录表单或凭据。当前界面没有关闭此自动尝试的开关；若你不接受，请暂勿使用真实 Apple 账号。若没有可用的已保存凭据，或 Apple 要求验证码/身份验证，请在该浏览器按官网提示完成。</p><p>正常退出 App 会关闭专用浏览器进程，并保留专用资料目录中的登录会话；连接启动失败时会保留窗口供检查。下次启动或 Apple 要求重新验证时，仍需按官网提示完成。</p><p>账号、商品与购买状态会显示在左侧。到达结账页后，请在专用浏览器核对信息并由你决定是否付款。</p><small>专用浏览器与日常浏览器资料隔离；无需额外开启 macOS 自动化或辅助功能权限。</small></html>
     """
     let demoHTML = """
     <html lang="zh"><meta charset="utf-8"><style>body{font:20px -apple-system;margin:12%;background:#f5f5f7}button{padding:14px 24px;border:0;border-radius:24px;background:#0071e3;color:white;font:16px -apple-system;margin-right:12px}</style><h1>离线购买演示</h1><p>使用正式执行引擎测试本地网页，不连接 Apple、不生成真实订单。</p><button id="add" onclick="this.hidden=true;document.getElementById('bag').hidden=false;document.getElementById('checkout').hidden=false;document.getElementById('result').textContent='购物袋：演示商品 × 1'">加入购物袋</button><div id="bag" data-autom="bag-item" hidden><a href="https://www.apple.com.cn/shop/product/demo001/a">DEMO001/A</a><select name="quantity"><option value="1">1</option></select></div><button id="checkout" hidden onclick="history.pushState({},'', '/shop/checkout');document.getElementById('result').textContent='订单确认页 · 演示完成，无真实订单'">结账</button><p id="result">等待预定时间…</p></html>
